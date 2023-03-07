@@ -26,7 +26,10 @@ class AuthController extends Controller
         ]);
 
         if($validator->fails()) {
-            return response()->json($validator->errors()->toJson(), 400);
+            return response()->json([
+                'status'    => 400,
+                'message'   => $validator->errors()->toJson()
+            ]);
         }
 
         $user = User::create(array_merge(
@@ -43,9 +46,10 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'message'   => 'User successfully registered',
+            'status'    => 200,
+            'message'   => 'Registrasi berhasil',
             'user'      => $user
-        ], 201);
+        ]);
     }
 
     public function login(Request $request)
@@ -68,16 +72,18 @@ class AuthController extends Controller
 
     public function createNewToken($token)
     {
+        $ttl_in_minutes = 60*24*100;
+
         return response()->json([
             'access_token'  => $token,
             'token_type'    => 'bearer',
             'status'        => 200,
             'message'       => 'Berhasil login',
-            'expires_in'    => auth()->factory()->getTTL()*60,
+            // 'expires_in'    => auth()->factory()->getTTL()*$ttl_in_minutes,
             'id'            => auth()->user()->id,
             'name'          => auth()->user()->name,
             'email'         => auth()->user()->email,
-            'roles'         => auth()->user()->roles->pluck('name'),
+            'roles'         => auth()->user()->getRoleNames()->first(),
         ]);
     }
 
@@ -93,7 +99,7 @@ class AuthController extends Controller
     {
         auth()->logout();
         return response()->json([
-            'message'   => 'User logged out',
+            'message'   => 'Berhasil logout',
             'status'    => 200
         ]);
     }

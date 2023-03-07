@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\HomeController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\PeminjamanController;
 
 /*
@@ -25,43 +26,37 @@ Route::get('/unautorized', function () {
     return response()->unauthorized();
 })->name('unautorized');
 
-// Route::group(['middleware' => 'api','prefix' => 'auth'], function ($router) {
-Route::group(['middleware' => 'auth:api'], function () {
+Route::group(['middleware' => 'auth:api'], function ($router) {
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Buku Route
-    Route::prefix('book')->group(function () {
-        Route::get('/all', [BookController::class, 'getAllBooks']);
-        Route::get('/{$id}', [BookController::class, 'getBook']);
-        //CRUD
-        Route::get('/create', [BookController::class, 'create']);
-        Route::post('/create', [BookController::class, 'store']);
-        Route::get('/{$id}/update', [BookController::class, 'show']);
-        Route::put('/{$id}/update', [BookController::class, 'update']);
-        Route::delete('/{$id}/delete', [BookController::class, 'destroy']);
-        //import Export
-        Route::get('/export/excel', [BookController::class, 'exportBook']);
-        Route::get('/export/pdf', [BookController::class, 'exportBookPdf']);
-        Route::get('/download/template', [BookController::class, 'exportTemplate']);
-        Route::post('/import/excel', [BookController::class, 'importBook']);
-    });
-
     // Kategori Route
     Route::prefix('category')->group(function () {
-        Route::get('/{$category}/book/all', [BookController::class, 'getBooksByCategory']);
-        Route::get('/all', [CategoryController::class, 'getAllCategories']);
-        Route::get('/{$id}', [CategoryController::class, 'getDetailCategory']);
-        //CRUD
+        Route::get('/all', [CategoryController::class, 'index']);
         Route::post('/create', [CategoryController::class, 'store']);
-        Route::put('/{$id}/update', [CategoryController::class, 'update']);
-        Route::delete('/{$id}/delete', [CategoryController::class, 'destroy']);
+        Route::get('/detail/{id}', [CategoryController::class, 'show']);
+        Route::post('/update/{id}', [CategoryController::class, 'update']);
+        Route::delete('/delete/{id}', [CategoryController::class, 'destroy']);
+    });
+
+    // Buku Route
+    Route::prefix('book')->group(function () {
+        Route::get('/all', [BookController::class, 'index']);
+        Route::post('/create', [BookController::class, 'store']);
+        Route::get('/detail/{id}', [BookController::class, 'show']);
+        Route::delete('/delete/{id}', [BookController::class, 'destroy']);
+        
+        // //import Export
+        // Route::get('/export/excel', [BookController::class, 'exportBook']);
+        // Route::get('/export/pdf', [BookController::class, 'exportBookPdf']);
+        // Route::get('/download/template', [BookController::class, 'exportTemplate']);
+        // Route::post('/import/excel', [BookController::class, 'importBook']);
     });
 
     // User Route
     Route::prefix('user')->group(function () {
-        Route::get('/all', [UserController::class, 'getAllUsers']);
-        Route::get('/{$id}', [UserController::class, 'getUser']);
+        Route::get('/all', [UserController::class, 'index']);
+        Route::get('/detail/{id}', [UserController::class, 'show']);
     });
 
     // Peminjaman Route

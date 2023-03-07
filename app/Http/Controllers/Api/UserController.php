@@ -8,25 +8,33 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function getAllUsers()
+    public function index(Request $request)
     {
-        try {
-            $users = User::with('roles')->latest()->get();
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data users', $e->getMessage());
+        $data = User::whereHas("roles", function($query) {
+            $query->whereNotIn("name", ["admin","visitor"]);
+        })->where('name', 'ILIKE', "%{$request->name}%")->latest();
+
+
+        if(isset($request->page)){
+            $data = $data->paginate(6);
+            $data->appends($request->only($request->keys()));
+        }else{
+            $data = $data->get();
         }
 
-        return response()->ok(['users' => $users], 'Sukses mengambil data users');
+        return response()->json([
+            'status'    => 200,
+            'data'      => $data
+        ]);
     }
 
-    public function getUser($id)
+    public function show($id)
     {
-        try {
-            $user = User::with('roles')->findOrFail($id);
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data user', $e->getMessage());
-        }
+        $data = User::with('roles')->where('id', $id)->first();
 
-        return response()->ok(['user' => $user], 'Sukses mengambil data user');
+        return response()->json([
+            'status'    => 200,
+            'data'      => $data
+        ]);
     }
 }

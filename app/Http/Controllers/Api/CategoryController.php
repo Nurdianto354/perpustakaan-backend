@@ -5,79 +5,144 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use DB;
+use Log;
+use Validator;
+use Carbon\Carbon;
 
 class CategoryController extends Controller
 {
-    public function getAllCategories()
+    public function index(Request $request)
     {
-        try {
-            $categories = Category::all();
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data categories', $e->getMessage());
-        }
-        return response()->ok(['categories' => $categories], 'Sukses mengambil data categories');
-    }
+        $data = Category::where('nama_kategori', 'ilike', "%{$request->nama_kategori}%");
 
-    public function getDetailCategory($id)
-    {
-        try {
-            $category = Category::findOrFail($id);
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data category', $e->getMessage());
+        if(isset($request->page)){
+            $data = $data->paginate(6);
+            $data->appends($request->only($request->keys()));
+        }else{
+            $data = $data->get();
         }
 
-        return response()->ok(['category' => $category], 'Sukses mengambil data category');
+        return response()->json([
+            'status'    => 200,
+            'data'      => $data
+        ]);
     }
 
     public function store(Request $request)
     {
-        request()->validate([
-            'nama_kategori' => 'required',
-        ]);
-
         DB::beginTransaction();
         try {
-            $category = Category::create([
-                'nama_kategori' => $request->input('nama_kategori')
+            $message = "menambahkan data kateogri";
+    
+            $validator = Validator::make($request->all(), [
+                'nama_kategori' => 'required',
             ]);
-            DB::commit();
+    
+            $category = Category::where('nama_kategori', $request->nama_kategori)->count();
+
+            if($category == 0) {
+                $category = Category::create([
+                    'nama_kategori' => $request->input('nama_kategori')
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'status'    => 200,
+                    'message'   => 'Berhasil '.$message
+                ]);
+            } else {
+                DB::rollBack();
+
+                return response()->json([
+                    'status'    => 200,
+                    'message'   => 'Gagal '.$message.'. Kategori '.$request->nama_kategori.' sudah ada'
+                ]);
+            }
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->internalServerError('Gagal menambahkan data', $e->getMessage());
-        }
 
-        return response()->created(['category' => $category], 'Berhasil menambahkan data');
+            return response()->json([
+                'status'    => 400,
+                'message'   => 'Gagal '.$message
+            ]);
+        }
+    }
+
+    public function show($id) {
+        $category = Category::findOrFail($id);
+
+        return response()->json([
+            'status'    => 200,
+            'data'      => $category
+        ]);
     }
 
     public function update(Request $request, $id)
     {
-        request()->validate([
-            'nama_kategori' => 'required',
-        ]);
+        Log::info($request);
+        Log::info($id);
+        $message = "memperbarui data kateogri";
 
         DB::beginTransaction();
         try {
-            $category = Category::findOrFail($id);
+            $category = Category::whereNotIn('id', [$id])->where('nama_kategori', $request['nama_kategori'])->count();
 
-            $category->update([
-                'nama_kategori' => $request->input('nama_kategori')
-            ]);
-            DB::commit();
+            if($category == 0) {
+                $category = Category::findOrFail($id);
+                $temp_name = $category->nama_kategori;
+
+                $category->nama_kategori    = $request['nama_kategori'];
+                $category->updated_at       = Carbon::now();
+                $category->save();
+
+                DB::commit();
+
+                return response()->json([
+                    'status'    => 200,
+                    'message'   => 'Berhasil '.$message.' dari '.$temp_name.' ke '.$request['nama_kategori']
+                ]);
+            } else {
+                DB::rollBack();
+
+                return response()->json([
+                    'status'    => 200,
+                    'message'   => 'Gagal '.$message.'. Kategori '.$request['nama_kategori'].' sudah ada'
+                ]);
+            }
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->internalServerError('Gagal mengubah data', $e->getMessage());
-        }
 
-        return response()->ok(['category' => $category], 'Berhasil mengubah data ' . $category->nama_kategori);
+            return response()->json([
+                'status'    => 400,
+                'message'   => 'Gagal '.$message
+            ]);
+        }
     }
 
     public function destroy($id)
     {
-        $category = Category::findOrFail($id);
-        $message = 'Berhasil menghapus data category ' . $category->judul;
-        $category->delete();
+        $message = "menghapus data kateogri";
 
-        return response()->noContent($message);
+        DB::beginTransaction();
+        try {
+            $category = Category::findOrFail($id);
+            $category->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'status'    => 200,
+                'message'   => 'Berhasil '.$message.' '.$category->nama_kategori
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status'    => 400,
+                'message'   => 'Gagal '.$message
+            ]);
+        }
     }
 }

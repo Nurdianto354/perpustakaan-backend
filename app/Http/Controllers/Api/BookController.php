@@ -13,160 +13,148 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
+use Validator;
+use Log;
 
 class BookController extends Controller
 {
-    public function getAllBooks()
+    public function index(Request $request)
     {
-        try {
-            $books = Book::with('category')->latest()->get();
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data buku ', $e->getMessage());
+        Log::info($request);
+        $data = Book::with('category')->where('judul', 'ilike', "%{$request->judul}%");
+
+        if(isset($request->page)){
+            $data = $data->paginate(6);
+            $data->appends($request->only($request->keys()));
+        }else{
+            $data = $data->get();
         }
 
-        return response()->ok(['books' => $books], 'Sukses mengambil semua data buku');
-    }
-
-    public function getBook($id)
-    {
-        try {
-            $book = Book::with('category')->findOrFail($id);
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data buku id = ' . $id, $e->getMessage());
-        }
-
-        return response()->ok(['book' => $book],  'Sukses mengambil data buku id = ' . $id);
-    }
-
-    public function getBooksByCategory($category)
-    {
-        $books = Book::with('category')->latest()->where('category_id', $category)->get();
-
-        return response()->ok(['books' => $books], 'Sukses mengambil data buku berdasarkan kategori');
-    }
-
-    public function create()
-    {
-        $categories = Category::all();
-        $years = [];
-
-        $date = Carbon::now();
-        for ($i = 0; $i <= 20; $i++) {
-            array_push($years, $date->year - $i);
-        }
-
-        return response()->ok(['categories' => $categories, 'years' => $years]);
+        return response()->json([
+            'status'    => 200,
+            'data'      => $data
+        ]);
     }
 
     public function store(Request $request)
     {
-        request()->validate([
-            'judul' => 'required',
-            'category_id' => 'required',
-            'pengarang' => 'required',
-            'tahun' => 'required',
-            'stok' => 'required|integer',
-            'path' => 'image|mimes:jpg,png,jpeg,gif,svg|max:2048',
-        ]);
-
         DB::beginTransaction();
         try {
-            $slug = explode(' ', strtolower($request->input('judul')));
-            $slug = implode('-', $slug);
-            $char = substr($request->input('judul'), 0, 1);
+            $message = "menambahkan data buku";
 
-            $count_kode = Book::where('kode_buku', 'LIKE', $char . '%')->count();
-
-            $penerbit = null;
-            if ($request->input('penerbit'))
-                $penerbit = $request->input('penerbit');
-
-            $image_path = '/image/book/default-image.png';
-            if ($request->file())
-                $image_path = $request->file('path')->store('image/book');
-
-            $book = Book::create([
-                'kode_buku' => $char . '-' . $count_kode + 1,
-                'judul' => $request->input('judul'),
-                'slug' => $slug,
-                'category_id' => $request->input('category_id'),
-                'pengarang' => $request->input('pengarang'),
-                'penerbit' => $penerbit,
-                'tahun' => $request->input('tahun'),
-                'stok' => $request->input('stok'),
-                'path' => $image_path,
+            $validator = Validator::make($request->all(), [
+                'kode_buku' => 'required',
+                'category_id' => 'required',
+                'judul' => 'required',
+                'penerbit' => 'required',
+                'pengarang' => 'required',
+                'tahun' => 'required',
+                'stok' => 'required|integer',
+                'path' => 'image|mimes:jpg,png,jpeg,gif,svg|max:2048',
             ]);
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->internalServerError('Gagal input data buku', $e->getMessage());
-        }
+            
+            if(isset($request->id)) {
+                $book = Book::findOrFail($request->id);
+                $book->updated_at   = Carbon::now();
 
-        return response()->created(['book' => $book], 'Buku berhasil dibuat');
+                if($request->path != null) {
+                    $path = "assets/image/book/".$data->path;
+
+                    if (file_exists($path)) {
+                        @unlink($path);
+                    }
+        
+                    $file       = $request->file('path');
+                    $date_time  = Carbon::now();
+                    $extension  = $file->getClientOriginalExtension();
+                    $name_file  = rand(11111,99999).'-'.$date_time->format('Y-m-d-H-i-s').'.'.$extension;
+    
+                    $request->file('path')->move("assets/image/book/", $name_file);
+                    $book->path         = $name_file;
+                }
+            } else {
+                $book = new Book();
+                $book->created_at   = Carbon::now();
+
+                if($request->path != null) {
+                    $file       = $request->file('path');
+                    $date_time  = Carbon::now();
+                    $extension  = $file->getClientOriginalExtension();
+                    $name_file  = rand(11111,99999).'-'.$date_time->format('Y-m-d-H-i-s').'.'.$extension;
+    
+                    $request->file('path')->move("assets/image/book/", $name_file);
+                    $book->path         = $name_file;
+                }
+            }
+
+            $book->kode_buku    = $request->kode_buku;
+            $book->category_id  = $request->category_id;
+            $book->judul        = $request->judul;
+            $book->slug         = $request->slug;
+            $book->penerbit     = $request->penerbit;
+            $book->pengarang    = $request->pengarang;
+            $book->tahun        = $request->tahun;
+            $book->stok         = $request->stok;
+            $book->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status'    => 200,
+                'message'   => "Berhasil ".$message
+            ]);
+        } catch (\Throwable $th) {
+            DB::rollBack();
+
+            return response()->json([
+                'status'    => 400,
+                'message'   => 'Gagal '.$message
+            ]);
+        }
     }
 
     public function show($id)
     {
-        $categories = Category::all();
-        $book = Book::findOrFail($id);
-        $years = [];
+        $data = Book::with('category')->where('id', $id)->first();
 
-        $date = Carbon::now();
-        for ($i = 0; $i <= 20; $i++) {
-            array_push($years, $date->year - $i);
-        }
-
-        return response()->ok(['book' => $book, 'year' => $years, 'categories' => $categories]);
-    }
-
-    public function update(Request $request, $id)
-    {
-        request()->validate([
-            'judul' => 'required',
-            'category_id' => 'required',
-            'pengarang' => 'required',
-            'tahun' => 'required',
-            'stok' => 'required|integer',
+        return response()->json([
+            'status'    => 200,
+            'data'      => $data
         ]);
-
-        DB::beginTransaction();
-        try {
-            $book = Book::findOrFail($id);
-
-            $kode = $book->kode_buku;
-            $slug = explode(' ', strtolower($request->input('judul')));
-            $slug = implode('-', $slug);
-
-            if ($request->input('judul') !== $book->judul) {
-                $char = substr($request->input('judul'), 0, 1);
-
-                $count_kode = Book::where('kode_buku', 'LIKE', $char . '%')->count();
-                $kode = $char . '-' . $count_kode + 1;
-            }
-
-            $book->update([
-                'kode_buku' => $kode,
-                'judul' => $request->input('judul'),
-                'slug' => $slug,
-                'category_id' => $request->input('category_id'),
-                'pengarang' => $request->input('pengarang'),
-                'tahun' => $request->input('tahun'),
-                'stok' => $request->input('stok'),
-            ]);
-            DB::commit();
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengupdate data buku ' . $book->judul, $e->getMessage());
-        }
-
-        return response()->ok(['book' => $book], 'Berhasil mengupdate data buku ' . $book->judul);
     }
 
     public function destroy($id)
     {
-        $book = Book::findOrFail($id);
-        $message = 'Berhasil menghapus data buku ' . $book->judul;
-        $book->delete();
-        return response()->noContent($message);
+        $message = "menghapus data buku";
+
+        DB::beginTransaction();
+        try {
+            $data = Book::findOrFail($id);
+
+            if($data->path != null) {
+                $path = "assets/image/book/".$data->path;
+
+                if (file_exists($path)) {
+                    @unlink($path);
+                }
+    
+                $data->delete();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status'    => 200,
+                'message'   => 'Berhasil '.$message.' '.$data->judul
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status'    => 400,
+                'message'   => 'Gagal '.$message
+            ]);
+        }
     }
 
     public function exportBookPdf()
@@ -216,6 +204,7 @@ class BookController extends Controller
         } catch (\Exception $e) {
             return response()->internalServerError('Gagal Import Buku', $e->getMessage());
         }
+        
         return response()->ok(['buku' => $books], 'Berhasil Import Buku');
     }
 }
