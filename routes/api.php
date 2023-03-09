@@ -45,12 +45,12 @@ Route::group(['middleware' => 'auth:api'], function ($router) {
         Route::post('/create', [BookController::class, 'store']);
         Route::get('/detail/{id}', [BookController::class, 'show']);
         Route::delete('/delete/{id}', [BookController::class, 'destroy']);
-        
-        // //import Export
-        // Route::get('/export/excel', [BookController::class, 'exportBook']);
-        // Route::get('/export/pdf', [BookController::class, 'exportBookPdf']);
-        // Route::get('/download/template', [BookController::class, 'exportTemplate']);
-        // Route::post('/import/excel', [BookController::class, 'importBook']);
+
+        //Import Export        
+        Route::get('/export/excel', [BookController::class, 'exportBook']);
+        Route::get('/export/pdf', [BookController::class, 'exportBookPdf']);
+        Route::get('/download/template', [BookController::class, 'exportTemplate']);
+        Route::post('/import/excel', [BookController::class, 'importBook']);
     });
 
     // User Route

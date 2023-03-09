@@ -81,8 +81,6 @@ class CategoryController extends Controller
 
     public function update(Request $request, $id)
     {
-        Log::info($request);
-        Log::info($id);
         $message = "memperbarui data kateogri";
 
         DB::beginTransaction();

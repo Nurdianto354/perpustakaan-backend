@@ -15,13 +15,17 @@ use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
 use Log;
+use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
     public function index(Request $request)
     {
-        Log::info($request);
         $data = Book::with('category')->where('judul', 'ilike', "%{$request->judul}%");
+
+        if(isset($request->category_id)) {
+            $data = $data->where('category_id', $request->category_id);
+        }
 
         if(isset($request->page)){
             $data = $data->paginate(6);
@@ -40,8 +44,6 @@ class BookController extends Controller
     {
         DB::beginTransaction();
         try {
-            $message = "menambahkan data buku";
-
             $validator = Validator::make($request->all(), [
                 'kode_buku' => 'required',
                 'category_id' => 'required',
@@ -53,26 +55,30 @@ class BookController extends Controller
                 'path' => 'image|mimes:jpg,png,jpeg,gif,svg|max:2048',
             ]);
             
+            $path = "public/assets/image/book/";
+
             if(isset($request->id)) {
+                $message = "memperbarui data buku";
+
                 $book = Book::findOrFail($request->id);
                 $book->updated_at   = Carbon::now();
 
                 if($request->path != null) {
-                    $path = "assets/image/book/".$data->path;
-
-                    if (file_exists($path)) {
-                        @unlink($path);
+                    if (Storage::exists($path.$book->path)) {
+                        Storage::delete($path.$book->path);
                     }
         
                     $file       = $request->file('path');
                     $date_time  = Carbon::now();
                     $extension  = $file->getClientOriginalExtension();
                     $name_file  = rand(11111,99999).'-'.$date_time->format('Y-m-d-H-i-s').'.'.$extension;
-    
-                    $request->file('path')->move("assets/image/book/", $name_file);
+                    
+                    Storage::disk('local')->put($path.$name_file, file_get_contents($file));
                     $book->path         = $name_file;
                 }
             } else {
+                $message = "menambahkan data buku";
+                
                 $book = new Book();
                 $book->created_at   = Carbon::now();
 
@@ -81,8 +87,8 @@ class BookController extends Controller
                     $date_time  = Carbon::now();
                     $extension  = $file->getClientOriginalExtension();
                     $name_file  = rand(11111,99999).'-'.$date_time->format('Y-m-d-H-i-s').'.'.$extension;
-    
-                    $request->file('path')->move("assets/image/book/", $name_file);
+
+                    Storage::disk('local')->put($path.$name_file, file_get_contents($file));
                     $book->path         = $name_file;
                 }
             }
@@ -104,6 +110,7 @@ class BookController extends Controller
                 'message'   => "Berhasil ".$message
             ]);
         } catch (\Throwable $th) {
+            Log::info($th);
             DB::rollBack();
 
             return response()->json([
@@ -132,14 +139,14 @@ class BookController extends Controller
             $data = Book::findOrFail($id);
 
             if($data->path != null) {
-                $path = "assets/image/book/".$data->path;
+                $path = "public/assets/image/book/";
 
-                if (file_exists($path)) {
-                    @unlink($path);
+                if (Storage::exists($path.$data->path)) {
+                    Storage::delete($path.$data->path);
                 }
-    
-                $data->delete();
             }
+    
+            $data->delete();
 
             DB::commit();
 

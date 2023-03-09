@@ -98,10 +98,10 @@ return [
     | This is not particularly recommended, so make sure you have appropriate
     | systems in place to revoke the token if necessary.
     | Notice: If you set this to null you should remove 'exp' element from 'required_claims' list.
-    |
+    | 'ttl' => env('JWT_TTL', 60),
     */
 
-    'ttl' => env('JWT_TTL', 60),
+    'ttl' => env('JWT_TTL', 20160),
 
     /*
     |--------------------------------------------------------------------------
@@ -117,7 +117,7 @@ return [
     | Some may want this instead of never expiring tokens for e.g. a mobile app.
     | This is not particularly recommended, so make sure you have appropriate
     | systems in place to revoke the token if necessary.
-    |
+    | 'refresh_ttl' => env('JWT_REFRESH_TTL', 20160),
     */
 
     'refresh_ttl' => env('JWT_REFRESH_TTL', 20160),

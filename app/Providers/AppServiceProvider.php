@@ -13,7 +13,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        // config()->set('jwt.ttl', 60*60*7);
     }
 
     /**
