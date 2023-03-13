@@ -61,10 +61,12 @@ Route::group(['middleware' => 'auth:api'], function ($router) {
 
     // Peminjaman Route
     Route::prefix('peminjaman')->group(function () {
-        Route::get('/', [PeminjamanController::class, 'getPeminjamanBuku']);
-        Route::get('/return', [PeminjamanController::class, 'getPengembalianBuku']);
-        Route::post('/book/{$bukuId}/member/{$memberId}', [PeminjamanController::class, 'actionPinjamBuku']);
-        Route::post('/book/{$bukuId}/accept', [PeminjamanController::class, 'acceptPeminjamanBuku']);
-        Route::post('/book/{$bukuId}/return', [PeminjamanController::class, 'returnPeminjamanBuku']);
+        Route::get('/all/{id}', [PeminjamanController::class, 'index']);
+        Route::post('/create', [PeminjamanController::class, 'create']);
+        // Route::get('/get', [PeminjamanController::class, 'getPeminjamanBuku']);
+        // Route::get('/return', [PeminjamanController::class, 'getPengembalianBuku']);
+        // Route::post('/book/{$bukuId}/member/{$memberId}', [PeminjamanController::class, 'actionPinjamBuku']);
+        // Route::post('/book/{$bukuId}/accept', [PeminjamanController::class, 'acceptPeminjamanBuku']);
+        // Route::post('/book/{$bukuId}/return', [PeminjamanController::class, 'returnPeminjamanBuku']);
     });
 });

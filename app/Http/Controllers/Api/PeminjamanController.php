@@ -10,106 +10,69 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Log;
 
 class PeminjamanController extends Controller
 {
-    public function actionPinjamBuku($bukuId, $memberId)
+    public function index(Request $request, $id)
     {
-        DB::beginTransaction();
-        try {
-            $peminjaman = Peminjaman::create([
-                'id_buku' => $bukuId,
-                'id_member' => $memberId,
-                'tanggal_peminjaman' => Carbon::now()->toDateString(),
-                'tanggal_pengembalian' => Carbon::now()->addDays(7)->toDateString(),
-                'status' => 1
-            ]);
-
-            $book = Book::findOrFail($bukuId);
-            $book->update([
-                'stok' => $book->stok - 1,
-            ]);
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->internalServerError('Gagal melakukan peminjaman', $e->getMessage());
-        }
-
-        return response()->created(['peminjaman' => $peminjaman, 'book' => $book], 'Sukses melakukan peminjaman');
-    }
-
-    public function acceptPeminjamanBuku($id)
-    {
-        DB::beginTransaction();
-        try {
-            $peminjaman = Peminjaman::findOrFail($id);
-
-            $peminjaman->update([
-                'status' => 2
-            ]);
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->internalServerError('Gagal menyetujui peminjaman', $e->getMessage());
-        }
-
-        return response()->ok(['peminjaman' => $peminjaman], 'Sukses menyetujui peminjaman');
-    }
-
-    public function returnPeminjamanBuku($id)
-    {
-        DB::beginTransaction();
-        try {
-            $peminjaman = Peminjaman::findOrFail($id);
-            $buku = Book::findOrFail($peminjaman->id_buku);
-
-            $peminjaman->update([
-                'status' => 3
-            ]);
-
-            $buku->update([
-                'stok' => $buku->stok + 1,
-            ]);
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->internalServerError('Gagal mengembalikan buku', $e->getMessage());
-        }
-
-        return response()->ok(['peminjaman' => $peminjaman, 'buku' => $buku], 'Berhasil mengembalikan buku');
-    }
-
-
-
-    public function getPeminjamanBuku()
-    {
-        try {
-            $user = User::with('roles')->find(Auth::id());
-            $data = Peminjaman::with('member')->with('book')->latest()->whereNot('status', 3);
-            if ($user->getRoleNames() == 'member') {
-                $data = $data->where('id_member', $user->id);
-            }
+        $data = Peminjaman::with(['book' => function($query) {
+            $query->select('id', 'judul', 'category_id', 'penerbit', 'pengarang', 'tahun', 'stok', 'path');
+            $query->with(['category' => function($query) {
+                $query->select('id', 'nama_kategori');
+            }]);
+        }])->where('id_member', $id)->orderBy('created_at', 'DESC');
+        
+        if(isset($request->page)){
+            $data = $data->paginate(6);
+            $data->appends($request->only($request->keys()));
+        }else{
             $data = $data->get();
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data peminjaman buku', $e->getMessage());
         }
 
-        return response()->ok(['peminjaman' => $data], 'Berhasil mengambil data peminjaman buku');
+        return response()->json([
+            'status'    => 200,
+            'data'      => $data
+        ]);
     }
 
-    public function getPengembalianBuku()
+    public function create(Request $request)
     {
+        Log::info($request);
+        $book = Book::findOrFail($request->id_buku)->judul;
+        
+        DB::beginTransaction();
         try {
-            $user = User::with('roles')->find(Auth::id());
-            $data = Peminjaman::with('member')->with('book')->latest()->where('status', 3);
-            if ($user->getRoleNames() == 'member') {
-                $data = $data->where('id_member', $user->id);
+            if(isset($request->id)) {
+                $data = Peminjaman::findOrFail($request->id);
+                $data->updated_at = Carbon::now();
+                $meesage = "Berhasil, mengembalikan buku ".$book.".";
+            } else {
+                $data = new Peminjaman();
+                $data->created_at = Carbon::now();
+                $meesage = "Berhasil, meminjam buku ".$book.".";
             }
-            $data = $data->get();
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal mengambil data pengembalian buku', $e->getMessage());
-        }
 
-        return response()->ok(['peminjaman' => $data], 'Berhasil mengambil data pengembalian buku');
+            $data->id_buku                = $request->id_buku;
+            $data->id_member              = $request->id_member;
+            $data->tanggal_peminjaman     = $request->tanggal_peminjaman;
+            $data->tanggal_pengembalian   = $request->tanggal_pengembalian;
+            $data->status                 = $request->status;
+            
+            $data->save();
+
+            DB::commit();
+            
+            return response()->json([
+                'status'    => 200,
+                'message'   => $meesage
+            ]);
+        } catch (\Throwable $th) {
+            Log::info($th);
+            return response()->json([
+                'status'    => 200,
+                'message'   => "Gagal, meminjam buku ".$book.". Mohon coba kembali."
+            ]);
+        }
     }
 }
