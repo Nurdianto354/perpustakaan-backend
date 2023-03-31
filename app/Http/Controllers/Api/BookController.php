@@ -7,15 +7,15 @@ use App\Exports\TemplateExport;
 use App\Http\Controllers\Controller;
 use App\Imports\BookImport;
 use App\Models\Book;
-use App\Models\Category;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Peminjaman;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
-use Validator;
-use Log;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use PDF;
+use Excel;
 
 class BookController extends Controller
 {
@@ -54,7 +54,7 @@ class BookController extends Controller
                 'stok' => 'required|integer',
                 'path' => 'image|mimes:jpg,png,jpeg,gif,svg|max:2048',
             ]);
-            
+
             $path = "public/assets/image/book/";
 
             if(isset($request->id)) {
@@ -67,18 +67,18 @@ class BookController extends Controller
                     if (Storage::exists($path.$book->path)) {
                         Storage::delete($path.$book->path);
                     }
-        
+
                     $file       = $request->file('path');
                     $date_time  = Carbon::now();
                     $extension  = $file->getClientOriginalExtension();
                     $name_file  = rand(11111,99999).'-'.$date_time->format('Y-m-d-H-i-s').'.'.$extension;
-                    
+
                     Storage::disk('local')->put($path.$name_file, file_get_contents($file));
                     $book->path         = $name_file;
                 }
             } else {
                 $message = "menambahkan data buku";
-                
+
                 $book = new Book();
                 $book->created_at   = Carbon::now();
 
@@ -122,7 +122,9 @@ class BookController extends Controller
 
     public function show($id)
     {
+        $count_buku = Peminjaman::where('id_buku', $id)->where('status', 1)->count();
         $data = Book::with('category')->where('id', $id)->first();
+        $data->stok = $data->stok - $count_buku;
 
         return response()->json([
             'status'    => 200,
@@ -145,7 +147,7 @@ class BookController extends Controller
                     Storage::delete($path.$data->path);
                 }
             }
-    
+
             $data->delete();
 
             DB::commit();
@@ -164,31 +166,6 @@ class BookController extends Controller
         }
     }
 
-    public function exportBookPdf()
-    {
-        try {
-            $books = Book::with('category')->latest()->get();
-
-            $data = [
-                'data_buku' => $books
-            ];
-
-            $pdf = Pdf::loadView('book.viewPdf', $data);
-            return $pdf->download('buku_export.pdf');
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal Download Buku Pdf', $e->getMessage());
-        }
-    }
-
-    public function exportBook()
-    {
-        try {
-            return Excel::download(new BookExport, 'buku_export.xlsx');
-        } catch (\Exception $e) {
-            return response()->internalServerError('Gagal Export Buku Excel', $e->getMessage());
-        }
-    }
-
     public function exportTemplate()
     {
         try {
@@ -204,14 +181,45 @@ class BookController extends Controller
             if (!$request->file('file_import')) {
                 return response()->invalidInput('File import tidak ditemukan');
             }
+
             $import = new BookImport();
             $import->setStartRow(2);
             Excel::import($import, $request->file('file_import'));
-            $books = Book::with('category')->latest()->get();
+
+            return response()->json([
+                'status'    => 200,
+                'message'   => 'Berhasil Import Buku'
+            ]);
         } catch (\Exception $e) {
+            Log::info($e);
             return response()->internalServerError('Gagal Import Buku', $e->getMessage());
         }
-        
-        return response()->ok(['buku' => $books], 'Berhasil Import Buku');
+    }
+
+    public function exportExcel()
+    {
+        try {
+            return Excel::download(new BookExport, 'buku_export.xlsx');
+        } catch (\Exception $e) {
+            Log::info($e);
+            return response()->internalServerError('Gagal Export Buku Excel', $e->getMessage());
+        }
+    }
+
+    public function exportPdf()
+    {
+        try {
+            $books = Book::with('category')->latest()->get();
+
+            $data = [
+                'data_buku' => $books
+            ];
+
+            $pdf = PDF::loadView('book.viewPdf', $data);
+
+            return $pdf->download('buku_export.pdf');
+        } catch (\Exception $e) {
+            return response()->internalServerError('Gagal Download Buku Pdf', $e->getMessage());
+        }
     }
 }

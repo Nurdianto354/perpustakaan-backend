@@ -26,6 +26,11 @@ Route::get('/unautorized', function () {
     return response()->unauthorized();
 })->name('unautorized');
 
+
+Route::get('/book/export/template', [BookController::class, 'exportTemplate']);
+Route::get('/book/export/excel', [BookController::class, 'exportExcel']);
+Route::get('/book/export/pdf', [BookController::class, 'exportPdf']);
+
 Route::group(['middleware' => 'auth:api'], function ($router) {
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -46,11 +51,11 @@ Route::group(['middleware' => 'auth:api'], function ($router) {
         Route::get('/detail/{id}', [BookController::class, 'show']);
         Route::delete('/delete/{id}', [BookController::class, 'destroy']);
 
-        //Import Export        
-        Route::get('/export/excel', [BookController::class, 'exportBook']);
-        Route::get('/export/pdf', [BookController::class, 'exportBookPdf']);
-        Route::get('/download/template', [BookController::class, 'exportTemplate']);
+        //Import Export
         Route::post('/import/excel', [BookController::class, 'importBook']);
+        // Route::get('/export/template', [BookController::class, 'exportTemplate']);
+        // Route::get('/export/excel', [BookController::class, 'exportExcel']);
+        // Route::get('/export/pdf', [BookController::class, 'exportPdf']);
     });
 
     // User Route

@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use DB;
-use Log;
-use Validator;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class CategoryController extends Controller
 {
@@ -34,11 +34,11 @@ class CategoryController extends Controller
         DB::beginTransaction();
         try {
             $message = "menambahkan data kateogri";
-    
+
             $validator = Validator::make($request->all(), [
                 'nama_kategori' => 'required',
             ]);
-    
+
             $category = Category::where('nama_kategori', $request->nama_kategori)->count();
 
             if($category == 0) {
