@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Book;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithStartRow;
@@ -10,6 +11,7 @@ use Maatwebsite\Excel\Concerns\WithStartRow;
 class BookImport implements ToModel, WithStartRow, WithMultipleSheets
 {
     private $setStartRow = 2;
+
     /**
      * @param array $row
      *
@@ -17,17 +19,15 @@ class BookImport implements ToModel, WithStartRow, WithMultipleSheets
      */
     public function model(array $row)
     {
-        // dd($row[2]);
+        Log::info("test");
+
         $slug = explode(' ', strtolower($row[0]));
         $slug = implode('-', $slug);
         $char = substr($row[0], 0, 1);
-
         $count_kode = Book::where('kode_buku', 'LIKE', $char . '%')->count();
 
-        $image_path = '/image/book/default-image.png';
-
         return new Book([
-            'kode_buku' => $char . '-' . $count_kode + 1,
+            'kode_buku' => $count_kode + 1,
             'judul' => $row[0],
             'slug' => $slug,
             'category_id' => $row[1],
@@ -35,7 +35,6 @@ class BookImport implements ToModel, WithStartRow, WithMultipleSheets
             'penerbit' => $row[3],
             'tahun' => $row[4],
             'stok' => $row[5],
-            'path' => $image_path
         ]);
     }
 

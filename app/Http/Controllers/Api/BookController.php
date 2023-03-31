@@ -182,9 +182,7 @@ class BookController extends Controller
                 return response()->invalidInput('File import tidak ditemukan');
             }
 
-            $import = new BookImport();
-            $import->setStartRow(2);
-            Excel::import($import, $request->file('file_import'));
+            Excel::import(new BookImport(), $request->file('file_import'));
 
             return response()->json([
                 'status'    => 200,
